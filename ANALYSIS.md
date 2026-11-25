@@ -137,7 +137,11 @@ EEPROM 产测 + 固件升级 + 传感器数据库 Nova231G/FD8 系列…）。
 | P2 | 0x7449 | `cmp edi,0x5DC` | `cmp edi,0x30D40` | 速率窗 1500ms→200ms（修根因①a）|
 | P3 | 0x745d | `lea ecx,[edx+edx]; mov eax,0x55555556; imul ecx` | `lea edx,[edx+edx*4]+nop×7` | 换算 ×2/3→×5（修根因①b）|
 | P5 | 0x1859c | 标题串 | "Areson Mouse Test Pro %s" | Pro 化 |
+| P6 | 0x127e8 | `test esi,esi / jne / test edi,edi / je`（零位移跳过，8B）| `jmp 0x414A92`+nop | 检查点改跳 cave（模式门控入口）|
+| P7 | 0x14a92 | .text 尾部空隙（全零 0x56E 字节）| cave：`cmp [0x41efc4],0 / jne 位移判断 / 直接写环` | **B 键模式门控**：标志=0（默认，BSS 零初始化）→ 全报文；=1 → 仅位移（原逻辑）|
+| P8 | 0x1e8 | .text VirtualSize 0x13A92 | 0x14000 | 保证 cave 所在空隙被完整映射 |
 
+模式切换复用原程序 'B' 键（WM_KEYUP 触发，`xor dword [0x41efc4],1`）——该全局全程序无其他读者（零副作用）；'L' 键标志被光标锁定功能占用故不采用。
 数学：200ms 窗 × 2000 格环 → 上限 2000/0.2 = **10000 Hz**（8K 有 25% 余量）；
 µs 存 32 位 71 分钟回绕，无符号减法对 <200ms 差值天然安全。
 **注册代码未动**：实测 Win11 接受原版 `{page1,usage0,flags0x20}` 注册（运行时

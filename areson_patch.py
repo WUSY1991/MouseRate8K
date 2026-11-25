@@ -30,22 +30,55 @@ PATCHES = [
      0x1859C,
      b"Mouse Test by Areson - %s\x00",
      b"Areson Mouse Test Pro %s\x00\x00"),
+    # P6: WM_INPUT 零位移检查(8B)改跳 cave —— 模式门控入口
+    # cave: [0x41efc4]==0(默认,BSS零初始化)→全报文直接写环; ==1→原位移判断
+    # 0x41efc4 由原程序 'B' 键切换(xor dword,0x41efc4,1)且全程序无其他读者(零副作用)
+    ("P6 零位移检查→cave 门控 (jmp 0x414A92)",
+     0x127E8,
+     bytes.fromhex("85F6750485FF7429"),
+     bytes.fromhex("E9A5220000" + "909090")),
+    ("P7 cave: B 键模式门控 (全报文默认/仅位移)",
+     0x14A92,
+     bytes.fromhex("00" * 0x27),
+     # +00 cmp dword [0x41efc4],0 ; +07 jne +14 ; +09 jmp 0x4127F0(写环)
+     # +14 test esi,esi ; +16 jnz +22 ; +18 test edi,edi ; +1A jnz +22
+     # +1C jmp 0x412819(跳过) ; +22 jmp 0x4127F0(写环)
+     bytes.fromhex(
+         "83 3D C4 EF 41 00 00"   # +00 cmp dword [0x41efc4],0
+         "75 0B"                  # +07 jne do_check(+14)
+         "E9 50 DD FF FF"         # +09 jmp 0x4127F0  全报文→写环
+         "90 90 90 90 90 90"      # +0E nop×6
+         "85 F6"                  # +14 test esi,esi
+         "75 0A"                  # +16 jnz +22
+         "85 FF"                  # +18 test edi,edi
+         "75 06"                  # +1A jnz +22
+         "E9 66 DD FF FF"         # +1C jmp 0x412819  仅位移→两者皆零则跳过
+         "90"                     # +21
+         "E9 37 DD FF FF"         # +22 jmp 0x4127F0  有位移→写环
+     ), "skip_unique"),
+    ("P8 .text VirtualSize 0x13A92→0x14000 (保证 cave 映射)",
+     0x1E8,
+     (0x13A92).to_bytes(4, "little"),
+     (0x14000).to_bytes(4, "little")),
 ]
 
 def main():
     data = bytearray(open(SRC, "rb").read())
     ok = True
-    for name, off, old, new in PATCHES:
+    for i, entry in enumerate(PATCHES):
+        name, off, old, new = entry[0], entry[1], entry[2], entry[3]
+        skip_unique = len(entry) > 4 and entry[4] == "skip_unique"
         if len(old) != len(new):
             print(f"[FATAL] {name}: 长度不等 {len(old)} vs {len(new)}")
             ok = False
             continue
-        # 唯一性断言
-        cnt = bytes(data).count(old)
-        if cnt != 1:
-            print(f"[FATAL] {name}: 模式出现 {cnt} 次（期望 1）")
-            ok = False
-            continue
+        # 唯一性断言（可跳过——如 cave 写入全零区无法唯一化，只校验偏移内容）
+        if not skip_unique:
+            cnt = bytes(data).count(old)
+            if cnt != 1:
+                print(f"[FATAL] {name}: 模式出现 {cnt} 次（期望 1）")
+                ok = False
+                continue
         if bytes(data[off:off + len(old)]) != old:
             print(f"[FATAL] {name}: 偏移 {hex(off)} 处字节不匹配")
             ok = False

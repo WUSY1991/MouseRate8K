@@ -8,7 +8,7 @@
 | 文件 | 说明 |
 |---|---|
 | `MouseRate8K.exe` | 自研满屏版（本 README 主体）|
-| `Areson Mouse Test Pro 8K.exe` | **原版 Areson 的二进制补丁版**（`areson_patch.py` 生成）：修掉 1K 上限两根因（1333Hz 环窗硬上限 + 整 ms 截断），上限提至 10000Hz，界面/功能与原版完全一致 |
+| `Areson Mouse Test Pro 8K.exe` | **原版 Areson 的二进制补丁版**（`areson_patch.py` 生成）：修掉 1K 上限两根因（1333Hz 环窗硬上限 + 整 ms 截断），上限提至 10000Hz，界面/功能与原版一致。**按 B 键（松开时触发）切换计数模式：全报文（默认）/ 仅位移** |
 
 ## 构建
 
