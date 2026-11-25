@@ -10,7 +10,7 @@ import sys
 sys.stdout.reconfigure(encoding="utf-8", errors="replace")
 
 SRC = r"D:\12-AI\0-rea\exe2c\Areson Mouse Test  2.023.exe"
-DST = r"D:\12-AI\0-rea\pollrate\Areson Mouse Test Pro 8K.exe"
+DST = r"D:\12-AI\0-rea\pollrate\Wu Mouse Test Pro 8K.exe"
 
 PATCHES = [
     # (名, 偏移, 原字节, 新字节)

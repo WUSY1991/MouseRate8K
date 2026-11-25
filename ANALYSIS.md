@@ -129,14 +129,14 @@ EEPROM 产测 + 固件升级 + 传感器数据库 Nova231G/FD8 系列…）。
 ## 五、原版 Areson 直接补丁 → "Areson Mouse Test Pro 8K"
 
 除自研 MouseRate8K 外，还按用户要求**直接给原版 exe 打了二进制补丁**
-（`areson_patch.py` → `Areson Mouse Test Pro 8K.exe`），4 处等长字节替换：
+（`areson_patch.py` → `Wu Mouse Test Pro 8K.exe`），4 处等长字节替换：
 
 | # | 位置(file) | 原指令 | 补丁 | 作用 |
 |---|---|---|---|---|
 | P1 | 0x6058 | `push 0x3E8` | `push 0xF4240` | 时间戳乘数 ×1000→×1000000：ms→µs（修根因②）|
 | P2 | 0x7449 | `cmp edi,0x5DC` | `cmp edi,0x30D40` | 速率窗 1500ms→200ms（修根因①a）|
 | P3 | 0x745d | `lea ecx,[edx+edx]; mov eax,0x55555556; imul ecx` | `lea edx,[edx+edx*4]+nop×7` | 换算 ×2/3→×5（修根因①b）|
-| P5 | 0x1859c | 标题串 | "Areson Mouse Test Pro %s" | Pro 化 |
+| P5 | 0x1859c | 旁路格式串 | "Wu" | 原品牌行（右下角另有 MFC 应用名=文件名） |
 | P6 | 0x127e8 | `test esi,esi / jne / test edi,edi / je`（零位移跳过，8B）| `jmp 0x414A92`+nop | 检查点改跳 cave（模式门控入口）|
 | P7 | 0x14a92 | .text 尾部空隙（全零 0x56E 字节）| cave：`cmp [0x41efc4],0 / jne 位移判断 / 直接写环` | **B 键模式门控**：标志=0（默认，BSS 零初始化）→ 全报文；=1 → 仅位移（原逻辑）|
 | P8 | 0x1e8 | .text VirtualSize 0x13A92 | 0x14000 | 保证 cave 所在空隙被完整映射 |
