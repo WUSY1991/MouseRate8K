@@ -15,7 +15,8 @@
 #pragma comment(lib, "hid.lib")
 
 static HWND g_hwnd = nullptr;
-static HWND g_comboDev = nullptr, g_comboScale = nullptr;
+static HWND g_comboDev = nullptr, g_comboScale = nullptr, g_comboSpan = nullptr;
+static const double kSpanList[7] = { 0.1, 0.5, 1.0, 2.0, 5.0, 10.0, 30.0 };
 static UINT g_comboGen = 0;
 static bool g_rebuilding = false;
 
@@ -27,6 +28,9 @@ static void PositionControls() {
     if (g_comboScale)
         MoveWindow(g_comboScale, L.rcChipScale.left, L.rcChipScale.top,
                    L.rcChipScale.right - L.rcChipScale.left, L.S(400), TRUE);
+    if (g_comboSpan)
+        MoveWindow(g_comboSpan, L.rcChipSpan.left, L.rcChipSpan.top,
+                   L.rcChipSpan.right - L.rcChipSpan.left, L.S(400), TRUE);
 }
 
 static void RebuildComboDev() {
@@ -93,12 +97,12 @@ static void OnHotkey(WPARAM vk) {
             g_set.logging = false;
         }
         break;
-    case 'B': g_set.showBand = !g_set.showBand; break;
-    case 'T': {  // 曲线时间窗循环：2s → 5s → 10s → 30s
-        static const double spans[4] = { 2.0, 5.0, 10.0, 30.0 };
+    case 'T': {  // 曲线时间窗循环（与右上"时间窗"下拉同步）
         int i = 0;
-        for (; i < 4; i++) if (g_set.xSeconds == spans[i]) break;
-        g_set.xSeconds = spans[(i + 1) % 4];
+        for (; i < 7; i++) if (g_set.xSeconds == kSpanList[i]) break;
+        i = (i + 1) % 7;
+        g_set.xSeconds = kSpanList[i];
+        if (g_comboSpan) SendMessageW(g_comboSpan, CB_SETCURSEL, (WPARAM)i, 0);
         break;
     }
     case 'D':   // 计数模式：全部报文（默认）/ 仅位移；切换后统计清零重测
@@ -196,7 +200,8 @@ static LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lPara
         return 0;
     }
     case WM_COMMAND:
-        if ((HWND)lParam == g_comboDev || (HWND)lParam == g_comboScale) {
+        if ((HWND)lParam == g_comboDev || (HWND)lParam == g_comboScale ||
+            (HWND)lParam == g_comboSpan) {
             WORD code = HIWORD(wParam);
             if (code == CBN_CLOSEUP || code == CBN_SELENDCANCEL) {
                 // 下拉列表关闭后把键盘焦点还给主窗口，恢复快捷键（否则 D/ESC 等会被下拉框吃掉）
@@ -218,9 +223,12 @@ static LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lPara
                             g_set.manualPin = nullptr;   // 回到自动
                         }
                     }
-                } else {
+                } else if ((HWND)lParam == g_comboScale) {
                     int kk = (int)SendMessageW(g_comboScale, CB_GETCURSEL, 0, 0);
                     if (kk != CB_ERR) g_set.scaleIdx = kk;
+                } else if ((HWND)lParam == g_comboSpan) {
+                    int kk = (int)SendMessageW(g_comboSpan, CB_GETCURSEL, 0, 0);
+                    if (kk != CB_ERR && kk >= 0 && kk < 7) g_set.xSeconds = kSpanList[kk];
                 }
                 SetFocus(hwnd);    // 选择完成即归还焦点
             }
@@ -290,8 +298,19 @@ int WINAPI wWinMain(HINSTANCE hInst, HINSTANCE, PWSTR, int nCmdShow) {
     for (int i = 0; i < 8; i++)
         SendMessageW(g_comboScale, CB_ADDSTRING, 0, (LPARAM)scaleItems[i]);
     SendMessageW(g_comboScale, CB_SETCURSEL, (WPARAM)g_set.scaleIdx, 0);
+    g_comboSpan = CreateWindowExW(0, L"COMBOBOX", nullptr,
+        WS_CHILD | WS_VISIBLE | CBS_DROPDOWNLIST,
+        0, 0, 80, 400, g_hwnd, (HMENU)1003, hInst, nullptr);
+    static const wchar_t* spanItems[7] = { L"100ms", L"500ms", L"1s", L"2s",
+                                           L"5s", L"10s", L"30s" };
+    for (int i = 0; i < 7; i++)
+        SendMessageW(g_comboSpan, CB_ADDSTRING, 0, (LPARAM)spanItems[i]);
+    int spanSel = 5;    // 默认 10s
+    for (int i = 0; i < 7; i++) if (g_set.xSeconds == kSpanList[i]) spanSel = i;
+    SendMessageW(g_comboSpan, CB_SETCURSEL, (WPARAM)spanSel, 0);
     SendMessageW(g_comboDev, WM_SETFONT, (WPARAM)comboFont, TRUE);
     SendMessageW(g_comboScale, WM_SETFONT, (WPARAM)comboFont, TRUE);
+    SendMessageW(g_comboSpan, WM_SETFONT, (WPARAM)comboFont, TRUE);
     PositionControls();
     RebuildComboDev();
 

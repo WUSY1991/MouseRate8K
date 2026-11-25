@@ -100,6 +100,7 @@ void ComputeLayout(int w, int h, UINT dpi) {
     int cw = L.S(320), ch = L.S(28);
     L.rcChipDev   = { w - m - cw, m, w - m, m + ch };
     L.rcChipScale = { w - m - cw, m + ch + L.S(6), w - m, m + 2 * ch + L.S(6) };
+    L.rcChipSpan  = { w - m - cw, m + 2 * ch + 2 * L.S(6), w - m, m + 3 * ch + 2 * L.S(6) };
     // 左下：曲线面板（缩小版）
     int kw = L.S(420), kh = L.S(220);
     L.rcCurve = { m, h - m - kh, m + kw, h - m };
@@ -200,7 +201,9 @@ static void Snapshot(FrameSnap& sn, int pw) {
         sn.lastDy = ch.lastDy;
         swprintf(sn.devname, 160, L"%s  [%04X/%04X]", ch.name, ch.vid, ch.pid);
 
-        // 曲线列分桶（跨步采样）
+        // 曲线列分桶（计数口径，与 max/min 同语义，抗抖动尖峰）：
+        // 列值 = 尾随窗口 W 内报文数 ÷ W；W = max(列宽, 4×平均间隔)。
+        // 抖动链路（蓝牙 7.5ms±抖动）下逐对 1/dt 会窜出 500~2400Hz 假尖峰，计数不会。
         sn.cols.assign((size_t)pw, ColStat{});
         double xSec = g_set.xSeconds;
         uint64_t t1 = nowQ;
@@ -212,32 +215,28 @@ static void Snapshot(FrameSnap& sn, int pw) {
                 uint64_t mid = a + (b - a) / 2;
                 if (ch.buf[mid % kRingCap].qpc < t0) a = mid + 1; else b = mid;
             }
-            double colDur = xSec / (double)pw;
             uint64_t nEv = ch.count - a;
-            uint64_t stride = 1;
-            if (nEv > (uint64_t)pw * 2) stride = nEv / ((uint64_t)pw * 2);
-            uint64_t dtFloor = (uint64_t)g_qpcFreq / 50000;
-            uint64_t gapCeil = (uint64_t)g_qpcFreq / 10;
-            int64_t prevIdx = (int64_t)a - 1;
-            for (uint64_t i = a; i < ch.count; i += stride) {
-                uint64_t q = ch.buf[i % kRingCap].qpc;
-                if (prevIdx >= (int64_t)lo) {
-                    uint64_t span = i - (uint64_t)prevIdx;
-                    uint64_t dt = q - ch.buf[(uint64_t)prevIdx % kRingCap].qpc;
-                    if (dt >= dtFloor * span && dt < gapCeil * span) {
-                        double hz = (double)span * (double)g_qpcFreq / (double)dt;
-                        double tSec = (double)(int64_t)(q - t0) / (double)g_qpcFreq;
-                        int c = (int)(tSec / colDur);
-                        if (c >= 0 && c < pw) {
-                            ColStat& s = sn.cols[(size_t)c];
-                            s.n++; s.sum += hz;
-                            if (hz > s.mx) s.mx = hz;
-                            if (hz < s.mn) s.mn = hz;
-                            if (hz > sn.yMax) sn.yMax = hz;
-                        }
-                    }
+            double colDur = xSec / (double)pw;
+            double meanIv = nEv > 0 ? xSec / (double)nEv : colDur;
+            double Wd = (4.0 * meanIv > colDur) ? 4.0 * meanIv : colDur;
+            if (Wd > xSec) Wd = xSec;
+            uint64_t colDurT = (uint64_t)(colDur * (double)g_qpcFreq);
+            uint64_t Wt = (uint64_t)(Wd * (double)g_qpcFreq);
+            if (Wt == 0) Wt = 1;
+            uint64_t sp = a, ep = a;               // 双指针：sp≥winStart, ep≥winEnd
+            for (int c = 0; c < pw; c++) {
+                uint64_t winEnd = t0 + (uint64_t)(c + 1) * colDurT;
+                uint64_t winStart = winEnd > Wt ? winEnd - Wt : 0;
+                if (winStart < t0) winStart = t0;
+                while (sp < ch.count && ch.buf[sp % kRingCap].qpc < winStart) sp++;
+                while (ep < ch.count && ch.buf[ep % kRingCap].qpc < winEnd) ep++;
+                uint64_t len = winEnd - winStart;
+                if (len > 0 && ep > sp) {
+                    double hz = (double)(ep - sp) * (double)g_qpcFreq / (double)len;
+                    ColStat& s = sn.cols[(size_t)c];
+                    s.n = 1; s.sum = hz;
+                    if (hz > sn.yMax) sn.yMax = hz;
                 }
-                prevIdx = (int64_t)i;
             }
         }
     }
@@ -346,14 +345,20 @@ static void DrawCurve(HDC dc, const FrameSnap& sn) {
         MoveToEx(dc, plot.left, y, nullptr);
         LineTo(dc, plot.right, y);
     }
-    for (int s = 0; s <= (int)xSec; s++) {
-        int x = plot.right - (int)((double)s / xSec * pw);
-        MoveToEx(dc, x, plot.top, nullptr);
-        LineTo(dc, x, plot.bottom);
-        if (s % 2 == 0) {
-            wchar_t lb[16];
-            swprintf(lb, 16, L"-%ds", s);
-            Txt(dc, x - g_layout.S(14), plot.bottom + g_layout.S(3), lb, g_fTiny, C_DIM);
+    {   // X 轴刻度：nice 步长，支持亚秒窗口（100ms~30s）
+        static const double steps[] = { 0.01, 0.02, 0.05, 0.1, 0.2, 0.5,
+                                        1, 2, 5, 10, 15, 30 };
+        double step = steps[sizeof(steps) / sizeof(steps[0]) - 1];
+        for (double st : steps)
+            if (st <= xSec / 4.0) { step = st; break; }
+        for (double v = step; v < xSec * 0.999; v += step) {
+            int x = plot.right - (int)(v / xSec * pw);
+            MoveToEx(dc, x, plot.top, nullptr);
+            LineTo(dc, x, plot.bottom);
+            wchar_t lb[20];
+            if (step < 1.0) swprintf(lb, 20, L"-%.0fms", v * 1000.0);
+            else            swprintf(lb, 20, L"-%.0fs", v);
+            Txt(dc, x - g_layout.S(18), plot.bottom + g_layout.S(3), lb, g_fTiny, C_DIM);
         }
     }
     SelectObject(dc, oldp);
@@ -365,27 +370,18 @@ static void DrawCurve(HDC dc, const FrameSnap& sn) {
                     plot.left - g_layout.S(2), plot.bottom - ph * i / 8 + g_layout.S(7) };
         TxtR(dc, lr, lb, g_fTiny, C_DIM, DT_RIGHT);
     }
-    wchar_t cap[48];
-    swprintf(cap, 48, L"回报率曲线  %s Hz  |  窗口 %.0fs",
-             g_set.scaleIdx == 7 ? L"自动" : ScaleName(g_set.scaleIdx), xSec);
+    wchar_t cap[64];
+    wchar_t spanTxt[20];
+    if (xSec < 1.0) swprintf(spanTxt, 20, L"%.0fms", xSec * 1000.0);
+    else            swprintf(spanTxt, 20, L"%.0fs", xSec);
+    swprintf(cap, 64, L"回报率曲线  %s Hz  |  窗口 %s",
+             g_set.scaleIdx == 7 ? L"自动" : ScaleName(g_set.scaleIdx), spanTxt);
     Txt(dc, plot.left + g_layout.S(4), rc.top + g_layout.S(1), cap, g_fSmall, C_DIM);
 
     auto yOf = [&](double hz) -> int {
         double t = hz / yMax; if (t < 0) t = 0; if (t > 1) t = 1;
         return plot.bottom - (int)(t * ph + 0.5);
     };
-    if (g_set.showBand && (int)sn.cols.size() == pw) {
-        HPEN band = CreatePen(PS_SOLID, 1, RGB(1, 92, 48));
-        HPEN op = (HPEN)SelectObject(dc, band);
-        for (int c = 0; c < pw; c++) {
-            const ColStat& s = sn.cols[(size_t)c];
-            if (!s.n) continue;
-            int y1 = yOf(s.mx), y2 = yOf(s.mn);
-            if (y2 > y1) { MoveToEx(dc, plot.left + c, y1, nullptr); LineTo(dc, plot.left + c, y2); }
-        }
-        SelectObject(dc, op);
-        DeleteObject(band);
-    }
     HPEN line = CreatePen(PS_SOLID, g_layout.S(2) < 1 ? 1 : g_layout.S(2), C_ACCENT);
     HPEN op = (HPEN)SelectObject(dc, line);
     bool down = false;
@@ -456,7 +452,7 @@ static void DrawButtons(HDC dc, const FrameSnap& sn) {
 static void DrawHint(HDC dc) {
     Panel(dc, g_layout.rcHint);
     TxtR(dc, g_layout.rcHint,
-         L"S 开始  P 暂停  C 清零  L 日志  D 模式  B 带宽  0-7 量程  M 最小化  ESC 退出"
+         L"S 开始  P 暂停  C 清零  L 日志  D 模式  T 时间窗  0-7 量程  M 最小化  ESC 退出"
          L"   |   点击右上角切换 设备/量程",
          g_fSmall, C_DIM, DT_CENTER);
 }

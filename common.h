@@ -62,7 +62,6 @@ struct Settings {
     bool   countAll = true;   // true=全部报文（Razer 语义，默认）；false=仅位移（Areson 语义，D 键切换）
     bool   paused = false;
     bool   logging = false;
-    bool   showBand = false;      // 曲线 min-max 带
     HANDLE manualPin = nullptr;   // nullptr = 自动选设备
     int    scaleIdx = 6;          // 预设 {125,250,500,1000,2000,4000,8000}，7=自动
     double xSeconds = 10.0;       // 曲线 X 窗口秒数
@@ -77,6 +76,7 @@ struct LayoutInfo {
     RECT rcBtns{};        // 右下：按键图标 + X/Y
     RECT rcChipDev{};     // 右上：设备切换 chip（点击循环）
     RECT rcChipScale{};   // 右上：量程 chip（点击循环）
+    RECT rcChipSpan{};    // 右上：时间窗下拉框
     int  S(int v) const { return (int)((int64_t)v * dpi / 96); }
 };
 
