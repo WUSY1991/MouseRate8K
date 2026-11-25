@@ -72,14 +72,14 @@ PATCHES = [
      0x18918,
      b"2.0.23\x00\x00",
      b"pro 1.0\x00"),
-    ("P12 旁路格式串去版本号（原 0x1859C，非标题本体）",
+    ("P12 右下角品牌行清空（0x1859C 原为标题格式，实为右下角显示的品牌串）",
      0x1859C,
      b"Areson Mouse Test Pro %s\x00\x00",
-     b"Areson Mouse Test Pro\x00\x00\x00\x00\x00"),
-    ("P13 真窗口标题 0x18584 Mouse Test by Areson → Areson Mouse Test Pro",
+     b"\x00" * 26),
+    ("P13 真窗口标题 0x18584 Mouse Test by Areson → Mouse Test Pro（去 Areson）",
      0x18584,
      b"Mouse Test by Areson\x00\x00\x00\x00",
-     b"Areson Mouse Test Pro\x00\x00\x00"),
+     b"Mouse Test Pro\x00" + b"\x00" * 9),
     # 原版数字画在持久画布上且透明背景，位数变少时旧字形残留（7805→70 残留"5"）。
     # %04d 零填充定宽：每个数位永远有字形覆盖，残影在构造上不可能。
     ("P14 速率显示 %-3d→%04d（零填充定宽，修 4 位→2 位残影）",
