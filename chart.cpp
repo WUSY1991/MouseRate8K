@@ -345,12 +345,13 @@ static void DrawCurve(HDC dc, const FrameSnap& sn) {
         MoveToEx(dc, plot.left, y, nullptr);
         LineTo(dc, plot.right, y);
     }
-    {   // X 轴刻度：nice 步长，支持亚秒窗口（100ms~30s）
+    {   // X 轴刻度：取"不超过窗宽 1/5 的最大 nice 步长"（每窗约 4~5 个刻度）
         static const double steps[] = { 0.01, 0.02, 0.05, 0.1, 0.2, 0.5,
                                         1, 2, 5, 10, 15, 30 };
-        double step = steps[sizeof(steps) / sizeof(steps[0]) - 1];
-        for (double st : steps)
-            if (st <= xSec / 4.0) { step = st; break; }
+        const int nSteps = (int)(sizeof(steps) / sizeof(steps[0]));
+        double step = steps[0];
+        for (int i = nSteps - 1; i >= 0; i--)      // 从大到小找第一个 ≤ 窗宽/4
+            if (steps[i] <= xSec / 4.0) { step = steps[i]; break; }
         for (double v = step; v < xSec * 0.999; v += step) {
             int x = plot.right - (int)(v / xSec * pw);
             MoveToEx(dc, x, plot.top, nullptr);
