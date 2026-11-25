@@ -80,6 +80,12 @@ PATCHES = [
      0x18584,
      b"Mouse Test by Areson\x00\x00\x00\x00",
      b"Areson Mouse Test Pro\x00\x00\x00"),
+    # 原版数字画在持久画布上且透明背景，位数变少时旧字形残留（7805→70 残留"5"）。
+    # %04d 零填充定宽：每个数位永远有字形覆盖，残影在构造上不可能。
+    ("P14 速率显示 %-3d→%04d（零填充定宽，修 4 位→2 位残影）",
+     0x18A94,
+     b"Report Rate : %-3d",
+     b"Report Rate : %04d"),
 ]
 
 def main():
