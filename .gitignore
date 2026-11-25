@@ -1,0 +1,8 @@
+*.exe
+*.obj
+*.res
+*.csv
+debug_state.txt
+screenshot.*
+app.ico
+analysis/ghidra_proj/

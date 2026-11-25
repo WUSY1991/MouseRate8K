@@ -1,0 +1,8 @@
+namespace RawInput;
+
+internal enum DeviceNotification
+{
+	DEVICE_NOTIFY_WINDOW_HANDLE = 0,
+	DEVICE_NOTIFY_SERVICE_HANDLE = 1,
+	DEVICE_NOTIFY_ALL_INTERFACE_CLASSES = 4
+}

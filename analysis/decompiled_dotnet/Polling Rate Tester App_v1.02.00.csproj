@@ -1,0 +1,46 @@
+<Project Sdk="Microsoft.NET.Sdk.WindowsDesktop">
+  <PropertyGroup>
+    <AssemblyName>PollingRateTesterApp</AssemblyName>
+    <GenerateAssemblyInfo>False</GenerateAssemblyInfo>
+    <OutputType>WinExe</OutputType>
+    <UseWPF>True</UseWPF>
+    <TargetFramework>net45</TargetFramework>
+    <Prefer32Bit>True</Prefer32Bit>
+  </PropertyGroup>
+  <PropertyGroup>
+    <LangVersion>11.0</LangVersion>
+    <AllowUnsafeBlocks>True</AllowUnsafeBlocks>
+  </PropertyGroup>
+  <PropertyGroup>
+    <ApplicationIcon>app.ico</ApplicationIcon>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+    <RootNamespace />
+  </PropertyGroup>
+  <ItemGroup>
+    <None Remove="razer_device.png" />
+    <None Remove="other_hand.png" />
+    <None Remove="compbg.png" />
+    <None Remove="other_device.png" />
+    <None Remove="hand.png" />
+    <None Remove="mainwindow.baml" />
+    <None Remove="razer_graph.png" />
+    <None Remove="menusetting.baml" />
+    <None Remove="other_graph.png" />
+    <None Remove="firmware_updater_2018.ico" />
+    <EmbeddedResource Include="razer_device.png" LogicalName="razer_device.png" />
+    <EmbeddedResource Include="other_hand.png" LogicalName="other_hand.png" />
+    <EmbeddedResource Include="compbg.png" LogicalName="compbg.png" />
+    <EmbeddedResource Include="other_device.png" LogicalName="other_device.png" />
+    <EmbeddedResource Include="hand.png" LogicalName="hand.png" />
+    <EmbeddedResource Include="mainwindow.baml" LogicalName="mainwindow.baml" />
+    <EmbeddedResource Include="razer_graph.png" LogicalName="razer_graph.png" />
+    <EmbeddedResource Include="menusetting.baml" LogicalName="menusetting.baml" />
+    <EmbeddedResource Include="other_graph.png" LogicalName="other_graph.png" />
+    <EmbeddedResource Include="firmware_updater_2018.ico" LogicalName="firmware_updater_2018.ico" />
+  </ItemGroup>
+  <ItemGroup>
+    <Reference Include="PresentationCore" />
+    <Reference Include="WindowsBase" />
+    <Reference Include="System.Core" />
+  </ItemGroup>
+</Project>
